@@ -8,6 +8,7 @@ A robust pipeline that:
 3. Extracts text properly
 4. Analyzes with Claude
 
+Built on top of FutureHouse's PaperQA2 framework for advanced document analysis.
 This version handles various download formats and edge cases.
 """
 

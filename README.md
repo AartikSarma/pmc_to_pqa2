@@ -1,6 +1,6 @@
 # PubMed to Claude Analysis Pipeline - Complete Integration
 
-A fully integrated pipeline that searches PubMed, downloads scientific papers, and analyzes them using Claude AI.
+A fully integrated pipeline that searches PubMed Central, downloads scientific papers, and analyzes them using Claude AI. Powered by FutureHouse's PaperQA2 for advanced document analysis and question-answering.
 
 ## ✅ Status: Fully Working
 
@@ -124,6 +124,16 @@ The pipeline is ready for:
 - Automated paper summarization
 - Question-answering from scientific literature
 
+## 🙏 Acknowledgments
+
+This pipeline is built on top of:
+- **[PaperQA2](https://github.com/Future-House/paper-qa)** by FutureHouse - Advanced document analysis and question-answering framework
+- **[LiteLLM](https://github.com/BerriAI/litellm)** - Universal LLM API interface
+- **NCBI E-utilities** - PubMed Central access and paper retrieval
+- **Anthropic Claude** - State-of-the-art language model for analysis
+
+Special thanks to the FutureHouse team for creating PaperQA2, which powers the sophisticated document analysis capabilities of this pipeline.
+
 ## 🎉 Success!
 
-The integration successfully combines PubMed's vast research database with Claude's analytical capabilities, creating a powerful tool for scientific literature analysis.
+The integration successfully combines PubMed's vast research database with Claude's analytical capabilities, powered by FutureHouse's PaperQA2, creating a powerful tool for scientific literature analysis.
