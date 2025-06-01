@@ -1,0 +1,40 @@
+# Environment files (contain API keys)
+.env
+tests/.env
+**/.env
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Generated analysis folders
+papers/
+papers_analysis/
+analysis_papers/
+test_papers*/
+*_papers/
+crispr_analysis/
+
+# Generated result files
+*.json
+analysis_*.json
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Virtual environments
+venv/
+env/
+.conda/
