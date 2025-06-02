@@ -42,8 +42,6 @@ class PubMedRetriever:
     BASE_SEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"  # For searching articles
     BASE_FETCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"    # For fetching article data
     PMC_URL = "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC"                       # Base URL for PMC articles
-    PMC_PDF_PREFIX = "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC"                # PDF URL prefix
-    PMC_PDF_SUFFIX = "/pdf/"                                                        # PDF URL suffix
     
     def __init__(self, email=None, api_key=None, output_dir="./papers"):
         """
@@ -62,14 +60,23 @@ class PubMedRetriever:
         self.output_dir = output_dir
         
         # Common headers to mimic a browser request
-        # This helps avoid being blocked by servers that restrict automated access
+        # Updated headers to better mimic a real browser
         self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
             'Connection': 'keep-alive',
             'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
         }
+        
+        # Create a session to maintain cookies across requests
+        self.session = requests.Session()
+        self.session.headers.update(self.headers)
         
         # Ensure directory paths are valid and usable
         self.output_dir = os.path.abspath(output_dir)
@@ -111,7 +118,7 @@ class PubMedRetriever:
             
         try:
             # Make the search request with a timeout to avoid hanging
-            response = requests.get(self.BASE_SEARCH_URL, params=params, headers=self.headers, timeout=30)
+            response = self.session.get(self.BASE_SEARCH_URL, params=params, timeout=30)
             
             if response.status_code != 200:
                 print(f"Error searching PubMed: {response.status_code}")
@@ -158,7 +165,7 @@ class PubMedRetriever:
             
         try:
             # Request article metadata
-            response = requests.get(self.BASE_FETCH_URL, params=params, headers=self.headers, timeout=30)
+            response = self.session.get(self.BASE_FETCH_URL, params=params, timeout=30)
             
             if response.status_code != 200:
                 print(f"Error fetching article {pmc_id}: {response.status_code}")
@@ -248,7 +255,7 @@ class PubMedRetriever:
         # This is necessary because direct PDF URLs can vary
         article_url = f"{self.PMC_URL}{pmc_id}/"
         try:
-            response = requests.get(article_url, headers=self.headers, timeout=30)
+            response = self.session.get(article_url, timeout=30)
             
             if response.status_code == 403:
                 # 403 Forbidden typically means anti-scraping measures triggered
@@ -262,79 +269,62 @@ class PubMedRetriever:
             print(f"Error connecting to PMC: {e}")
             return None
         
-        # Parse the page to find the PDF link using multiple strategies
+        # Parse the page to find the PDF link
         soup = BeautifulSoup(response.content, 'html.parser')
         
-        # Try multiple possible selectors for PDF links
-        # PMC's site structure might change, so we try several methods
-        pdf_link = None
+        # Look for PDF links - PMC articles have PDF links with specific patterns
+        pdf_filename = None
         
-        # Method 1: Look for the PDF link in the formats menu
-        formats_menu = soup.select_one('.article-formats')
-        if formats_menu:
-            pdf_links = formats_menu.select('a[href*=".pdf"]')
-            if pdf_links:
-                pdf_link = pdf_links[0]
+        # Method 1: Look for links containing 'pdf' in href
+        for link in soup.find_all('a', href=True):
+            href = link['href']
+            # Look for links that end with .pdf and contain manuscript ID
+            if href.endswith('.pdf') and ('nihms' in href or 'PMC' in href):
+                pdf_filename = href
+                break
         
-        # Method 2: Direct PDF link with specific class
-        if not pdf_link:
-            pdf_link = soup.select_one('a.int-view.view-pdf-button')
+        # Method 2: Look for PDF button/link with specific classes
+        if not pdf_filename:
+            pdf_link = soup.find('a', {'class': lambda x: x and any('pdf' in cls.lower() for cls in x)})
+            if pdf_link and pdf_link.get('href'):
+                pdf_filename = pdf_link['href']
         
-        # Method 3: Any anchor with "PDF" text
-        if not pdf_link:
-            for link in soup.select('a'):
-                if link.get_text() and 'PDF' in link.get_text():
-                    pdf_link = link
-                    break
+        if not pdf_filename:
+            print(f"Could not find PDF link for PMC{pmc_id}")
+            return None
         
-        # Method 4: Look for links with PDF in the URL
-        if not pdf_link:
-            pdf_links = soup.select('a[href*=".pdf"]')
-            if pdf_links:
-                pdf_link = pdf_links[0]
-        
-        # Method 5: Try to construct the PDF URL directly based on common patterns
-        if not pdf_link:
-            # PMC articles often have a predictable PDF URL structure
-            direct_pdf_url = f"{self.PMC_PDF_PREFIX}{pmc_id}{self.PMC_PDF_SUFFIX}"
-            print(f"Trying direct PDF URL: {direct_pdf_url}")
-            
-            try:
-                # Use HEAD request to check if URL exists without downloading content
-                direct_response = requests.head(direct_pdf_url, headers=self.headers, timeout=10)
-                if direct_response.status_code == 200:
-                    pdf_url = direct_pdf_url
-                    print(f"Direct PDF URL worked!")
-                else:
-                    print(f"Could not find PDF link for PMC{pmc_id}")
-                    print(f"Please try accessing the article manually at: {article_url}")
-                    return None
-            except requests.exceptions.RequestException:
-                print(f"Could not find PDF link for PMC{pmc_id}")
-                print(f"Please try accessing the article manually at: {article_url}")
-                return None
+        # Construct the full PDF URL
+        if pdf_filename.startswith('/'):
+            pdf_url = f"https://www.ncbi.nlm.nih.gov{pdf_filename}"
+        elif not pdf_filename.startswith('http'):
+            # The PDF is relative to the article URL
+            pdf_url = f"{article_url}{pdf_filename}"
         else:
-            # Get the PDF URL from the link found on the page
-            pdf_url = pdf_link.get('href')
-            
-            # Handle relative URLs by converting to absolute
-            if pdf_url and pdf_url.startswith('/'):
-                pdf_url = "https://www.ncbi.nlm.nih.gov" + pdf_url
-            elif pdf_url and not (pdf_url.startswith('http://') or pdf_url.startswith('https://')):
-                # Handle case where URL is relative to current page
-                pdf_url = f"{article_url}{pdf_url}"
-                
-            print(f"Found PDF link: {pdf_url}")
+            pdf_url = pdf_filename
+        
+        print(f"Found PDF URL: {pdf_url}")
         
         # Download the PDF
         try:
-            pdf_response = requests.get(pdf_url, headers=self.headers, timeout=30)
+            pdf_response = self.session.get(pdf_url, timeout=60, allow_redirects=True)
         except requests.exceptions.RequestException as e:
             print(f"Error downloading PDF: {e}")
             return None
         
         if pdf_response.status_code != 200:
             print(f"Error downloading PDF: {pdf_response.status_code}")
+            return None
+        
+        # Check if we actually got a PDF
+        if not pdf_response.content.startswith(b'%PDF'):
+            print(f"Downloaded content is not a PDF (got {pdf_response.headers.get('content-type', 'unknown')})")
+            
+            # Check if it's the POW challenge page
+            if b'Preparing to download' in pdf_response.content:
+                print("PMC is showing a Proof of Work challenge page.")
+                print("This is an anti-bot mechanism. Manual download may be required.")
+                print(f"Please download manually from: {article_url}")
+            
             return None
         
         # Create a filename based on PMC ID and title
@@ -386,7 +376,7 @@ class PubMedRetriever:
             
         try:
             print(f"Attempting to download XML via E-utilities...")
-            response = requests.get(self.BASE_FETCH_URL, params=params, headers=self.headers, timeout=30)
+            response = self.session.get(self.BASE_FETCH_URL, params=params, timeout=30)
             
             # Check if response is valid and has substantial content
             # Small responses likely indicate error messages rather than article XML
@@ -396,7 +386,7 @@ class PubMedRetriever:
                 # Fallback: Try via direct PMC page
                 article_url = f"{self.PMC_URL}{pmc_id}/"
                 print(f"Trying to find XML link on article page: {article_url}")
-                page_response = requests.get(article_url, headers=self.headers, timeout=30)
+                page_response = self.session.get(article_url, timeout=30)
                 
                 if page_response.status_code != 200:
                     print(f"Failed to access article page: {page_response.status_code}")
@@ -425,7 +415,7 @@ class PubMedRetriever:
                     xml_url = f"{article_url}{xml_url}"
                 
                 print(f"Found XML link: {xml_url}")
-                xml_response = requests.get(xml_url, headers=self.headers, timeout=30)
+                xml_response = self.session.get(xml_url, timeout=30)
                 
                 if xml_response.status_code != 200:
                     print(f"Failed to download XML: {xml_response.status_code}")
@@ -486,7 +476,7 @@ class PubMedRetriever:
             
         try:
             print(f"Attempting to download text via E-utilities...")
-            response = requests.get(self.BASE_FETCH_URL, params=params, headers=self.headers, timeout=30)
+            response = self.session.get(self.BASE_FETCH_URL, params=params, timeout=30)
             
             # Check if response is valid and has substantial content
             if response.status_code != 200 or len(response.content) < 500:
@@ -496,7 +486,7 @@ class PubMedRetriever:
                 article_url = f"{self.PMC_URL}{pmc_id}/"
                 print(f"Extracting text from article page as fallback: {article_url}")
                 
-                page_response = requests.get(article_url, headers=self.headers, timeout=30)
+                page_response = self.session.get(article_url, timeout=30)
                 if page_response.status_code != 200:
                     print(f"Failed to access article page: {page_response.status_code}")
                     return None
@@ -663,11 +653,12 @@ def main():
         sys.exit(1)
         
     # Print usage warnings about possible anti-scraping measures
-    print("Note: PubMed may block automated access. If you encounter 403 errors, consider:")
-    print("1. Using the --email parameter with your email address")
-    print("2. Adding delays between requests (already set to 3 seconds)")
-    print("3. Requesting fewer articles at once")
-    print("4. Using a proxy or VPN if you continue to have issues")
+    print("Note: PubMed may implement anti-bot measures including:")
+    print("1. Proof of Work challenges for PDF downloads")
+    print("2. Rate limiting and IP blocking")
+    print("3. Using the --email parameter with your email address may help")
+    print("4. XML format is often more reliable than PDF")
+    print("")
     
     # Set up command-line argument parsing
     parser = argparse.ArgumentParser(description='Search PubMed Central and download article PDFs')

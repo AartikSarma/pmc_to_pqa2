@@ -1,4 +1,4 @@
-# PubMed to Claude Analysis Pipeline - Complete Integration
+# Retrieve papers from PMC and send them to PaperQA2/Claude
 
 A fully integrated pipeline that searches PubMed Central, downloads scientific papers, and analyzes them using Claude AI. Powered by FutureHouse's PaperQA2 for advanced document analysis and question-answering.
 

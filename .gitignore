@@ -38,3 +38,6 @@ Thumbs.db
 venv/
 env/
 .conda/
+
+# Generated documentation
+CLAUDE.md
