@@ -1,6 +1,6 @@
 # PubMed to PaperQA2 Analysis Pipeline
 
-A streamlined pipeline that searches PubMed Central, downloads scientific papers, and analyzes them using Claude AI through FutureHouse's PaperQA2 framework.
+A streamlined pipeline that searches PubMed Central, downloads scientific papers, and analyzes them with FutureHouse's PaperQA2 and Claude Sonnet 3.5
 
 ## ✅ Status: Fully Working
 
