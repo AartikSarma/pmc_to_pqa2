@@ -36,7 +36,7 @@ python paperqa2_simple.py
 ```
 
 This will automatically:
-- Search for ARDS molecular phenotype papers
+- Search for ARDS molecular phenotype papers (as an example)
 - Download and convert them to text format
 - Analyze them with PaperQA2
 - Save results to `simple_papers/ards_analysis_results_[timestamp].json`
@@ -125,7 +125,7 @@ pmc_ids = retriever.search_pubmed(query, max_results=10)
 - **"Proof of Work challenge"**: Normal - pipeline automatically uses XML fallback
 - **Rate limiting (429 errors)**: Reduce `max_results` or add delays
 - **No papers found**: Try broader search terms
-- **API errors**: Verify both `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` in `.env` file (PaperQA2 requires both)
+- **API errors**: Verify both `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` in `.env` file 
 
 ### PMC Access Notes
 - PMC now uses JavaScript-based anti-bot protection for PDFs
